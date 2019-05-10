@@ -46,10 +46,12 @@ buf_size = int(len(glucose_triceps) / p)
 
 # Start K-Means
 # Creating buffers for data to send to proceses
+k = 2
 glubuf = np.zeros(buf_size * 2, dtype='i')
 tribuf = np.zeros(buf_size * 2, dtype='i')
+seeds = np.zeros([2,2])
 if r == 0:
-    seeds = init_centroids(glucose_bmi, 2)
+    seeds = init_centroids(glucose_triceps, 2)
     comm.Bcast(seeds, root=0)
     comm.Scatter(glucose, glubuf, root=0)
     comm.Scatter(triceps, tribuf, root=0)
@@ -58,6 +60,21 @@ if r == 0:
 glubuf = np.delete(glubuf, np.s_[1::2], 0)
 tribuf = np.delete(tribuf, np.s_[1::2], 0)
 
+# seeds[0] = glucose centers
+# seeds[0][0] = glucose center 1
+# seeds[1] = triceps centers
+# seeds[1][0] = triceps tenter 1
+
+d = np.zeros([2, len(glubuf)])
+
+# Not finished yet
 while MSE == previousMSE:
     previousMSE = MSE
     MSE_t = 0
+    #for j in range(1, k + 1):
+    m_t = np.zeros(k + 1)
+    n_t = np.zeros(k + 1)
+    n = len(glubuf)
+    for i in range(r * n / p, (r + 1) * (n / p)):
+        for j in range(0, k):
+            d[j][i] = ((glubuf[i] - seeds[0][j]) ** 2) + ((tribuf[i] - seeds[1][j]) ** 2)
