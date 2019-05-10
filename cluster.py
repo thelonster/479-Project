@@ -12,8 +12,6 @@ df = pd.read_csv('PimaIndians.csv')
 previousMSE = 0
 MSE = math.inf
 
-#fig = plt.figure()
-
 df = df.sort_values(by=['test'])
 
 neg = []
@@ -24,11 +22,8 @@ for x in range(1, 392):
     else:
         pos.append(df.loc[x])
 
-#print(neg['test'])
 neg = pd.DataFrame.from_dict(neg)
 pos = pd.DataFrame.from_dict(pos)
-#print(neg['diabetes'])
-#print(pos)
 
 plt.scatter(neg['glucose'], neg['bmi'], marker='o')
 plt.scatter(pos['glucose'], pos['bmi'], marker='X')
