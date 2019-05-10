@@ -1,5 +1,5 @@
 import pandas as pd
-#import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import math
 import numpy as np
 from mpi4py import MPI
@@ -42,20 +42,34 @@ def init_centroids(data, k):
     np.random.shuffle(centroids)
     return centroids[:k]
 
+def closest_centroid(points, centroids):
+    """returns an array containing the index to the nearest centroid for each point"""
+    distances = np.sqrt(((points - centroids[:, np.newaxis])**2).sum(axis=2))
+    return np.argmin(distances, axis=0)
+
+def move_centroids(points, closest, centroids):
+    """returns the new centroids assigned from the points closest to them"""
+    return np.array([points[closest==k].mean(axis=0) for k in range(centroids.shape[0])])
+
 buf_size = int(len(glucose_triceps) / p)
 
 # Start K-Means
 # Creating buffers for data to send to proceses
-k = 2
 glubuf = np.zeros(buf_size * 2, dtype='i')
 tribuf = np.zeros(buf_size * 2, dtype='i')
-seeds = np.zeros([2,2])
+seeds = np.zeros([4,4], dtype='i')
 if r == 0:
     seeds = init_centroids(glucose_triceps, 2)
-    comm.Bcast(seeds, root=0)
-    comm.Scatter(glucose, glubuf, root=0)
-    comm.Scatter(triceps, tribuf, root=0)
 
+comm.Scatter(glucose, glubuf, root=0)
+comm.Scatter(triceps, tribuf, root=0)
+comm.Bcast(seeds[0])
+comm.Bcast(seeds[1])
+
+# Removing the extra zeros
+if r != 0:
+    seeds = np.delete(seeds, np.s_[1::2], 1)
+    seeds = seeds[:2]
 # This removes the extraneous zeros
 glubuf = np.delete(glubuf, np.s_[1::2], 0)
 tribuf = np.delete(tribuf, np.s_[1::2], 0)
@@ -65,16 +79,22 @@ tribuf = np.delete(tribuf, np.s_[1::2], 0)
 # seeds[1] = triceps centers
 # seeds[1][0] = triceps tenter 1
 
-d = np.zeros([2, len(glubuf)])
+glutri = np.append(np.vstack(glubuf), np.vstack(tribuf), axis=1)
+# Doing 2-Means 100 times to find the center
+for a in range(0, 100):
+    closest = closest_centroid(glutri, seeds)
+    new_seeds = move_centroids(glutri, closest, seeds)
 
-# Not finished yet
-while MSE == previousMSE:
-    previousMSE = MSE
-    MSE_t = 0
-    #for j in range(1, k + 1):
-    m_t = np.zeros(k + 1)
-    n_t = np.zeros(k + 1)
-    n = len(glubuf)
-    for i in range(r * n / p, (r + 1) * (n / p)):
-        for j in range(0, k):
-            d[j][i] = ((glubuf[i] - seeds[0][j]) ** 2) + ((tribuf[i] - seeds[1][j]) ** 2)
+    sum_seeds = np.zeros(4, dtype=float)
+    new_seeds = np.reshape(new_seeds, (1, 4))
+    comm.Allreduce(new_seeds, sum_seeds, op=MPI.SUM)
+    sum_seeds /= p
+    seeds = np.reshape(sum_seeds, (2, 2))
+
+
+if r == 0:
+    print('Center 1: ', seeds[0])
+    print('Center 2: ', seeds[1])
+    plt.scatter(glucose, triceps)
+    plt.scatter(seeds[:,0], seeds[:,1], marker='X')
+    plt.show()
