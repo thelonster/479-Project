@@ -93,8 +93,9 @@ for a in range(0, 100):
 
 
 if r == 0:
+    closest = closest_centroid(glucose_triceps, seeds)
     print('Center 1: ', seeds[0])
     print('Center 2: ', seeds[1])
-    plt.scatter(glucose, triceps)
+    plt.scatter(glucose, triceps, c=closest)
     plt.scatter(seeds[:,0], seeds[:,1], marker='X')
     plt.show()
