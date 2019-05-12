@@ -1,6 +1,5 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import math
 import numpy as np
 from mpi4py import MPI
 
@@ -10,9 +9,7 @@ comm = MPI.COMM_WORLD
 p = comm.Get_size()
 r = comm.Get_rank()
 
-previousMSE = 0
-MSE = math.inf
-
+# Used to plot diabetics and non-diabetics
 neg = []
 pos = []
 for x in range(1, 392):
@@ -24,11 +21,14 @@ for x in range(1, 392):
 neg = pd.DataFrame.from_dict(neg)
 pos = pd.DataFrame.from_dict(pos)
 
-#plt.scatter(neg['glucose'], neg['triceps'], marker='o')
-#plt.scatter(pos['glucose'], pos['triceps'], marker='X')
-#plt.xlabel('glucose')
-#plt.ylabel('diastolic')
-#plt.show()
+# Creating scatter plot
+if r == 0:
+    plt.scatter(neg['glucose'], neg['triceps'], marker='o', label='Non-Diabetic')
+    plt.scatter(pos['glucose'], pos['triceps'], marker='X', label='Diabetic')
+    plt.xlabel('glucose')
+    plt.ylabel('triceps')
+    plt.legend()
+    plt.show()
 
 # Saving the essential data from the DataFrame
 glucose_triceps = df.copy()
@@ -36,7 +36,9 @@ glucose_triceps = glucose_triceps.drop(columns=['pregnant', 'diastolic', 'bmi', 
 glucose_triceps = np.array(glucose_triceps)
 glucose = np.array(df.copy()['glucose'])
 triceps = np.array(df.copy()['triceps'])
+test = df.copy()['test']
 
+# Functions for k-means
 def init_centroids(data, k):
     centroids = data.copy()
     np.random.shuffle(centroids)
@@ -91,7 +93,8 @@ for a in range(0, 100):
     sum_seeds /= p
     seeds = np.reshape(sum_seeds, (2, 2))
 
-
+# Creating scatter plot of data with clustered classes
+# Also calculating Accuracy, Confusion Matrix, and GINI index
 if r == 0:
     closest = closest_centroid(glucose_triceps, seeds)
     print('Center 1: ', seeds[0])
@@ -99,3 +102,31 @@ if r == 0:
     plt.scatter(glucose, triceps, c=closest)
     plt.scatter(seeds[:,0], seeds[:,1], marker='X')
     plt.show()
+    tp = 0
+    fp = 0
+    tn = 0
+    fn = 0
+    for a in range(0, len(df)):
+        if test[a] == 0:
+            if closest[a] == 0:
+                tn += 1
+            else:
+                fn += 1
+        else:
+            if closest[a] == 1:
+                tp += 1
+            else:
+                fp += 1
+    if tn < fn:
+        temp1 = tn
+        temp2 = tp
+        tp = fp
+        tn = fn
+        fn = temp1
+        fp = temp2
+    accuracy = (tn + tp) / (len(df))
+    print('Accuracy: ', accuracy)
+    print('Confusion Matrix: ', tp, fp)
+    print('                  ', fn, tn)
+    gini = 2 * (len(neg) / len(df)) * (len(pos) / len(df))
+    print('GINI index: ', gini)
